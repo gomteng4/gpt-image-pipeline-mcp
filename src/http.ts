@@ -351,9 +351,10 @@ app.use("/api", licenseRouter);
 
 // OpenAPI 스펙 (Custom GPT Actions 가 import 하는 엔드포인트)
 app.get("/openapi.json", (req, res) => {
-  const publicUrl =
-    process.env.PUBLIC_URL ||
-    `${req.protocol}://${req.get("host")}`;
+  const host = req.get("host") || "localhost:3333";
+  const isLocal = host.startsWith("localhost") || host.startsWith("127.") || host.startsWith("0.");
+  const proto = req.header("x-forwarded-proto") || (isLocal ? "http" : "https");
+  const publicUrl = process.env.PUBLIC_URL || `${proto}://${host}`;
   res.json(buildOpenApiSpec(publicUrl));
 });
 
