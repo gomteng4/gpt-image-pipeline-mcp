@@ -68,6 +68,7 @@ interface SavePromptsArgs {
   targetPath?: string;
   thumbnailMode?: boolean;
   prompts: PromptInput[];
+  ownerKey?: string | null;
 }
 
 export async function handleSavePrompts(args: SavePromptsArgs) {
@@ -84,6 +85,7 @@ export async function handleSavePrompts(args: SavePromptsArgs) {
       slide_size: args.slideSize ?? null,
       target_path: args.targetPath ?? null,
       thumbnail_mode: args.thumbnailMode ?? false,
+      owner_key: args.ownerKey ?? null,
     })
     .select()
     .single();
@@ -99,6 +101,7 @@ export async function handleSavePrompts(args: SavePromptsArgs) {
     prompt: p.prompt,
     filename: p.filename ?? null,
     status: "pending",
+    owner_key: args.ownerKey ?? null,
   }));
 
   const { error: insErr } = await sb.from("slide_prompts").insert(rows);
