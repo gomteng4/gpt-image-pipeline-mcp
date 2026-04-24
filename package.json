@@ -1,0 +1,29 @@
+{
+  "name": "gpt-image-pipeline-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for saving GPT-generated images directly (file transfer, not URL) to Supabase Storage",
+  "type": "module",
+  "main": "dist/http.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/http.js",
+    "start:stdio": "node dist/server.js",
+    "dev": "tsx watch src/http.ts",
+    "dev:stdio": "tsx watch src/server.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.7.4",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
