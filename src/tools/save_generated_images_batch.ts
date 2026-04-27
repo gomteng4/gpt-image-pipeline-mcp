@@ -1,4 +1,4 @@
-import { getSupabase, getBucket } from "../lib/supabase.js";
+import { getSupabase, getBucket, safeStorageKey } from "../lib/supabase.js";
 
 export const saveGeneratedImagesBatchSchema = {
   name: "save_generated_images_batch",
@@ -173,10 +173,14 @@ export async function handleSaveGeneratedImagesBatch(args: Args) {
       if (sig.detected) mime = sig.detected;
 
       const ext = mime.includes("jpeg") ? "jpg" : mime.split("/")[1] ?? "png";
-      const filename =
+      // 표시용 (한글 OK)
+      const displayFilename =
         (img.filename && img.filename.replace(/[\\/]/g, "_").trim()) ||
         (slide.filename ?? `slide-${img.slideNo}.${ext}`);
-      const storagePath = `projects/${args.projectId}/${filename}`;
+      // Storage 키 (ASCII only, S3 호환)
+      const storageFilename =
+        safeStorageKey(displayFilename) || `slide-${img.slideNo}.${ext}`;
+      const storagePath = `projects/${args.projectId}/${storageFilename}`;
 
       const { error: upErr } = await sb.storage
         .from(bucket)
@@ -189,7 +193,7 @@ export async function handleSaveGeneratedImagesBatch(args: Args) {
           status: "done",
           storage_path: storagePath,
           error_message: null,
-          filename,
+          filename: displayFilename,
         })
         .eq("id", slide.id);
 

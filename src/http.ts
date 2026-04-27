@@ -8,7 +8,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { getSupabase, getBucket } from "./lib/supabase.js";
+import { getSupabase, getBucket, safeStorageKey } from "./lib/supabase.js";
 import { generateImage } from "./lib/openai.js";
 import { verifyLicense } from "./lib/license.js";
 import {
@@ -175,10 +175,11 @@ app.post("/batch-generate", async (req, res) => {
       const img = await generateImage(it.prompt, size, quality);
       const buffer = Buffer.from(img.base64, "base64");
 
-      const filename =
+      const displayFilename =
         (it.filename && it.filename.replace(/[\\/]/g, "_").trim()) ||
         `slide-${it.slideNo}.png`;
-      const storagePath = `projects/${project.id}/${filename}`;
+      const storageFilename = safeStorageKey(displayFilename) || `slide-${it.slideNo}.png`;
+      const storagePath = `projects/${project.id}/${storageFilename}`;
 
       const { error: upErr } = await sb.storage
         .from(bucket)
@@ -319,6 +320,104 @@ licenseRouter.post("/projects/:projectId/images/batch", async (req, res) => {
     res.json(result);
   } catch (e: unknown) {
     res.status(400).json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+// POST /api/projects/:projectId/process — pending 프롬프트들을 순차 처리
+licenseRouter.post("/projects/:projectId/process", async (req, res) => {
+  const sb = getSupabase();
+  const bucket = getBucket();
+  const projectId = req.params.projectId;
+  const ownerKey = (req as any).ownerKey;
+
+  try {
+    const { data: project } = await sb
+      .from("projects")
+      .select("id, name, slide_size, owner_key")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (!project) return res.status(404).json({ ok: false, error: "프로젝트 없음" });
+    if (project.owner_key && project.owner_key !== ownerKey) {
+      return res.status(403).json({ ok: false, error: "소유자 아님" });
+    }
+
+    const size =
+      project.slide_size && /^\d+x\d+$/.test(project.slide_size)
+        ? (project.slide_size as "1024x1024")
+        : "1024x1024";
+    const quality = "high";
+
+    const { data: pending } = await sb
+      .from("slide_prompts")
+      .select("id, slide_no, title, prompt, filename, status")
+      .eq("project_id", projectId)
+      .eq("status", "pending")
+      .order("slide_no", { ascending: true });
+
+    const results: Array<{
+      slideNo: number;
+      status: "done" | "failed";
+      storagePath?: string;
+      error?: string;
+    }> = [];
+
+    for (const slide of pending ?? []) {
+      // status: pending → in_progress
+      await sb
+        .from("slide_prompts")
+        .update({ status: "in_progress" })
+        .eq("id", slide.id);
+
+      try {
+        const img = await generateImage(slide.prompt, size, quality);
+        const buffer = Buffer.from(img.base64, "base64");
+
+        const filename =
+          (slide.filename && slide.filename.replace(/[\\/]/g, "_").trim()) ||
+          `slide-${slide.slide_no}.png`;
+        const storagePath = `projects/${projectId}/${filename}`;
+
+        const { error: upErr } = await sb.storage
+          .from(bucket)
+          .upload(storagePath, buffer, {
+            contentType: img.mimeType,
+            upsert: true,
+          });
+        if (upErr) throw new Error(`storage upload: ${upErr.message}`);
+
+        await sb
+          .from("slide_prompts")
+          .update({
+            status: "done",
+            storage_path: storagePath,
+            error_message: null,
+          })
+          .eq("id", slide.id);
+
+        results.push({ slideNo: slide.slide_no, status: "done", storagePath });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        await sb
+          .from("slide_prompts")
+          .update({ status: "failed", error_message: msg })
+          .eq("id", slide.id);
+        results.push({ slideNo: slide.slide_no, status: "failed", error: msg });
+      }
+    }
+
+    return res.json({
+      ok: true,
+      projectId,
+      processed: results.length,
+      doneCount: results.filter((r) => r.status === "done").length,
+      failedCount: results.filter((r) => r.status === "failed").length,
+      results,
+    });
+  } catch (e: unknown) {
+    res.status(500).json({
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+    });
   }
 });
 
