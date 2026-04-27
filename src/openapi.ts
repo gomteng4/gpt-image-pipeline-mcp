@@ -64,17 +64,19 @@ export function buildOpenApiSpec(publicUrl: string) {
       "/api/projects": {
         post: {
           operationId: "createProject",
-          summary: "새 프로젝트 생성 (프롬프트 배열 저장)",
+          summary: "새 프로젝트 생성 (titles 권장)",
           description:
-            "이미지 생성 전에 프로젝트와 프롬프트 목록을 저장합니다. " +
-            "반환된 projectId 를 이후 이미지 저장 단계에서 사용.",
+            "**권장 사용법**: titles 배열 (제목 문자열 N개) 만 보냅니다. " +
+            "서버가 표준 썸네일 prompt 와 ASCII 안전 파일명을 자동 생성하므로 " +
+            "ChatGPT 가 prompts 배열 전체를 컨텍스트에 보유하지 않아 콜라주 시도 자체가 불가능합니다. " +
+            "기존 prompts 직접 지정도 호환 유지. 반환된 projectId 를 이후 단계에서 사용.",
           requestBody: {
             required: true,
             content: {
               "application/json": {
                 schema: {
                   type: "object",
-                  required: ["projectName", "prompts"],
+                  required: ["projectName"],
                   properties: {
                     projectName: { type: "string" },
                     slideSize: {
@@ -87,8 +89,15 @@ export function buildOpenApiSpec(publicUrl: string) {
                         "ZIP 다운로드 시 대상 폴더 힌트. 예: '콘텐츠/ommeca/썸네일/'",
                     },
                     thumbnailMode: { type: "boolean" },
+                    titles: {
+                      type: "array",
+                      description:
+                        "권장: 제목 문자열 배열만 전송. 서버가 표준 썸네일 prompt 와 ASCII 파일명 자동 생성.",
+                      items: { type: "string" },
+                    },
                     prompts: {
                       type: "array",
+                      description: "기존 호환 — prompt 직접 지정 시 사용.",
                       items: { $ref: "#/components/schemas/PromptItem" },
                     },
                   },
