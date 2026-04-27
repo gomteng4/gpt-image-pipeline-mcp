@@ -70,6 +70,52 @@ async function fetchImageBytes(url: string): Promise<{ buffer: Buffer; mime: str
   return { buffer: Buffer.from(ab), mime };
 }
 
+/**
+ * 이미지 시그니처 검증 — 손상된/빈 데이터 거부.
+ * PNG: 89 50 4E 47, JPEG: FF D8 FF, WebP: RIFF...WEBP, GIF: GIF8
+ */
+function validateImageSignature(buffer: Buffer): { ok: boolean; detected?: string; reason?: string } {
+  if (buffer.length < 12) {
+    return { ok: false, reason: `데이터가 너무 작음 (${buffer.length}B)` };
+  }
+  // PNG
+  if (
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47
+  ) {
+    return { ok: true, detected: "image/png" };
+  }
+  // JPEG
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { ok: true, detected: "image/jpeg" };
+  }
+  // WebP (RIFF....WEBP)
+  if (
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  ) {
+    return { ok: true, detected: "image/webp" };
+  }
+  // GIF
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) {
+    return { ok: true, detected: "image/gif" };
+  }
+  return {
+    ok: false,
+    reason: `알 수 없는 이미지 포맷 (signature: ${Array.from(buffer.slice(0, 4))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join(" ")})`,
+  };
+}
+
 export async function handleSaveGeneratedImagesBatch(args: Args) {
   if (!args.images?.length) throw new Error("images 배열이 비어 있습니다.");
   const sb = getSupabase();
@@ -116,6 +162,15 @@ export async function handleSaveGeneratedImagesBatch(args: Args) {
         throw new Error("data 또는 imageUrl 중 하나는 필수");
       }
       if (buffer.length === 0) throw new Error("빈 이미지 데이터");
+
+      const sig = validateImageSignature(buffer);
+      if (!sig.ok) {
+        throw new Error(
+          `이미지 시그니처 검증 실패: ${sig.reason}. ` +
+            `재시도하세요. base64 가 잘렸거나 손상되었을 가능성 있습니다.`
+        );
+      }
+      if (sig.detected) mime = sig.detected;
 
       const ext = mime.includes("jpeg") ? "jpg" : mime.split("/")[1] ?? "png";
       const filename =
