@@ -249,6 +249,49 @@ export function buildOpenApiSpec(publicUrl: string) {
           },
         },
       },
+      "/api/projects/{projectId}/next-prompt": {
+        get: {
+          operationId: "getNextPrompt",
+          summary: "다음 처리할 프롬프트 1개 반환 (자동으로 in_progress 표시)",
+          description:
+            "프로젝트의 pending 슬라이드 중 가장 작은 slide_no 를 반환하고 status 를 in_progress 로 갱신합니다. " +
+            "더 이상 pending 이 없으면 done=true 반환. " +
+            "이 엔드포인트로 받은 단 하나의 프롬프트로 정확히 이미지 1장만 생성하고, " +
+            "addImagesBatch 로 즉시 저장한 뒤 다시 이 엔드포인트를 호출하는 순차 흐름을 권장합니다.",
+          parameters: [
+            {
+              name: "projectId",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "성공",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean" },
+                      done: { type: "boolean" },
+                      slideId: { type: "string" },
+                      slideNo: { type: "integer" },
+                      title: { type: "string" },
+                      filename: { type: "string" },
+                      prompt: { type: "string" },
+                      instruction: { type: "string" },
+                      doneCount: { type: "integer" },
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       "/api/projects/{projectId}/status": {
         get: {
           operationId: "getProjectStatus",

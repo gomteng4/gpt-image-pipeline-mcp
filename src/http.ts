@@ -323,6 +323,73 @@ licenseRouter.post("/projects/:projectId/images/batch", async (req, res) => {
   }
 });
 
+// GET /api/projects/:projectId/next-prompt — 다음 pending 프롬프트 1개 반환 + in_progress 로 변경
+licenseRouter.get("/projects/:projectId/next-prompt", async (req, res) => {
+  const sb = getSupabase();
+  const projectId = req.params.projectId;
+  const ownerKey = (req as any).ownerKey;
+
+  try {
+    const { data: project } = await sb
+      .from("projects")
+      .select("id, name, target_path, owner_key")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (!project) return res.status(404).json({ ok: false, error: "프로젝트 없음" });
+    if (project.owner_key && project.owner_key !== ownerKey) {
+      return res.status(403).json({ ok: false, error: "소유자 아님" });
+    }
+
+    const { data: next } = await sb
+      .from("slide_prompts")
+      .select("id, slide_no, title, prompt, filename")
+      .eq("project_id", projectId)
+      .eq("status", "pending")
+      .order("slide_no", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (!next) {
+      const { count } = await sb
+        .from("slide_prompts")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", projectId)
+        .eq("status", "done");
+      return res.json({
+        ok: true,
+        done: true,
+        message: "더 이상 pending 프롬프트 없음",
+        doneCount: count ?? 0,
+      });
+    }
+
+    await sb
+      .from("slide_prompts")
+      .update({ status: "in_progress" })
+      .eq("id", next.id);
+
+    return res.json({
+      ok: true,
+      done: false,
+      slideId: next.id,
+      slideNo: next.slide_no,
+      title: next.title,
+      filename: next.filename,
+      prompt: next.prompt,
+      instruction:
+        "이 프롬프트로 정확히 1장의 이미지를 생성하세요. " +
+        "여러 장을 한 번에 만들지 마세요 (콜라주 금지). " +
+        "다른 슬라이드 내용을 섞지 마세요. " +
+        "생성 후 즉시 addImagesBatch 를 [{ slideNo, filename, data(base64) }] 형식으로 1개만 호출하세요.",
+    });
+  } catch (e: unknown) {
+    res.status(500).json({
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+});
+
 // POST /api/projects/:projectId/process — pending 프롬프트들을 순차 처리
 licenseRouter.post("/projects/:projectId/process", async (req, res) => {
   const sb = getSupabase();
