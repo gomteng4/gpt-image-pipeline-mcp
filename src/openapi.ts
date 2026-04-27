@@ -6,7 +6,7 @@
 export function buildOpenApiSpec(publicUrl: string) {
   const serverUrl = publicUrl.replace(/\/$/, "");
   return {
-    openapi: "3.1.0",
+    openapi: "3.0.3",
     info: {
       title: "gpt-image-pipeline",
       description:
