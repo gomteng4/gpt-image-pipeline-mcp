@@ -347,11 +347,12 @@ licenseRouter.post("/projects/:projectId/process", async (req, res) => {
         : "1024x1024";
     const quality = "high";
 
+    // pending + failed 둘 다 처리 (failed 는 재시도)
     const { data: pending } = await sb
       .from("slide_prompts")
       .select("id, slide_no, title, prompt, filename, status")
       .eq("project_id", projectId)
-      .eq("status", "pending")
+      .in("status", ["pending", "failed"])
       .order("slide_no", { ascending: true });
 
     const results: Array<{
