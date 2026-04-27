@@ -6,7 +6,7 @@
 export function buildOpenApiSpec(publicUrl: string) {
   const serverUrl = publicUrl.replace(/\/$/, "");
   return {
-    openapi: "3.0.3",
+    openapi: "3.1.0",
     info: {
       title: "gpt-image-pipeline",
       description:
@@ -135,7 +135,21 @@ export function buildOpenApiSpec(publicUrl: string) {
           responses: {
             "200": {
               description: "성공",
-              content: { "application/json": { schema: { type: "object" } } },
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean" },
+                      projects: {
+                        type: "array",
+                        items: { type: "object", properties: {} },
+                      },
+                      count: { type: "integer" },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -162,7 +176,19 @@ export function buildOpenApiSpec(publicUrl: string) {
           responses: {
             "200": {
               description: "삭제 성공",
-              content: { "application/json": { schema: { type: "object" } } },
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean" },
+                      deletedProjectId: { type: "string" },
+                      deletedProjectName: { type: "string" },
+                      removedStorage: { type: "integer" },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -202,7 +228,23 @@ export function buildOpenApiSpec(publicUrl: string) {
           responses: {
             "200": {
               description: "성공",
-              content: { "application/json": { schema: { type: "object" } } },
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean" },
+                      projectId: { type: "string" },
+                      doneCount: { type: "integer" },
+                      failedCount: { type: "integer" },
+                      results: {
+                        type: "array",
+                        items: { type: "object", properties: {} },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -222,7 +264,21 @@ export function buildOpenApiSpec(publicUrl: string) {
           responses: {
             "200": {
               description: "성공",
-              content: { "application/json": { schema: { type: "object" } } },
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean" },
+                      project: { type: "object", properties: {} },
+                      slides: {
+                        type: "array",
+                        items: { type: "object", properties: {} },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
