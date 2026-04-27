@@ -323,6 +323,79 @@ licenseRouter.post("/projects/:projectId/images/batch", async (req, res) => {
   }
 });
 
+// POST /api/projects/:projectId/add-prompt — 제목 1개 → 슬라이드 추가 + 프롬프트 즉시 반환
+licenseRouter.post("/projects/:projectId/add-prompt", async (req, res) => {
+  const sb = getSupabase();
+  const projectId = req.params.projectId;
+  const ownerKey = (req as any).ownerKey;
+  const title: string = (req.body?.title || "").trim();
+
+  if (!title) {
+    return res.status(400).json({ ok: false, error: "title 필드 필수" });
+  }
+
+  try {
+    const { data: project } = await sb
+      .from("projects")
+      .select("id, name, owner_key")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (!project) return res.status(404).json({ ok: false, error: "프로젝트 없음" });
+    if (project.owner_key && project.owner_key !== ownerKey) {
+      return res.status(403).json({ ok: false, error: "소유자 아님" });
+    }
+
+    // 현재 슬라이드 수 확인 → slideNo 결정
+    const { count } = await sb
+      .from("slide_prompts")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId);
+    const slideNo = (count ?? 0) + 1;
+
+    // ASCII 슬러그 파일명 생성
+    let slug = title.toLowerCase()
+      .replace(/[^\x20-\x7e]/g, "")
+      .replace(/[^\w\s-]/g, "")
+      .replace(/[\s-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "") || "image";
+    const num = String(slideNo).padStart(2, "0");
+    const filename = `${num}_${slug}.png`;
+
+    const prompt =
+      `Modern minimal blog thumbnail for the topic "${title}". ` +
+      `Square 1024x1024, single standalone image, flat design, clean white or solid color background, ` +
+      `bold sans-serif Korean title typography. ` +
+      `Strictly NO collage, NO grid, NO multiple panels, NO split layout. ` +
+      `Output exactly ONE image.`;
+
+    const { error: insErr } = await sb.from("slide_prompts").insert({
+      project_id: projectId,
+      slide_no: slideNo,
+      title,
+      prompt,
+      filename,
+      status: "in_progress",
+      owner_key: ownerKey,
+    });
+    if (insErr) throw new Error(insErr.message);
+
+    return res.json({
+      ok: true,
+      slideNo,
+      title,
+      filename,
+      prompt,
+      instruction:
+        "이 prompt 로 정확히 이미지 1장만 생성하세요. " +
+        "생성 후 즉시 addImagesBatch([{ slideNo, filename, data }]) 를 호출하세요. " +
+        "배열 길이는 반드시 1입니다. 콜라주·그리드 절대 금지.",
+    });
+  } catch (e: unknown) {
+    res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
 // GET /api/projects/:projectId/next-prompt — 다음 pending 프롬프트 1개 반환 + in_progress 로 변경
 licenseRouter.get("/projects/:projectId/next-prompt", async (req, res) => {
   const sb = getSupabase();

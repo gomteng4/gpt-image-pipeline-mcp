@@ -258,6 +258,58 @@ export function buildOpenApiSpec(publicUrl: string) {
           },
         },
       },
+      "/api/projects/{projectId}/add-prompt": {
+        post: {
+          operationId: "addSinglePrompt",
+          summary: "제목 1개 추가 → 프롬프트 즉시 반환 (콜라주 방지 핵심)",
+          description:
+            "제목 1개를 받아 슬라이드를 추가하고, 서버가 생성한 프롬프트를 즉시 반환합니다. " +
+            "반환된 prompt 로 이미지 1장 생성 후 addImagesBatch 를 호출하세요. " +
+            "다음 제목으로 이 엔드포인트를 다시 호출하는 방식으로 반복합니다.",
+          parameters: [
+            {
+              name: "projectId",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["title"],
+                  properties: {
+                    title: { type: "string", description: "이미지 제목 (한 번에 1개만)" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "성공",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      ok: { type: "boolean" },
+                      slideNo: { type: "integer" },
+                      title: { type: "string" },
+                      filename: { type: "string" },
+                      prompt: { type: "string" },
+                      instruction: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       "/api/projects/{projectId}/next-prompt": {
         get: {
           operationId: "getNextPrompt",
