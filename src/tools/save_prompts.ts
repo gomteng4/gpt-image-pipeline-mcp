@@ -115,6 +115,6 @@ export async function handleSavePrompts(args: SavePromptsArgs) {
     projectId: project.id,
     projectName: project.name,
     totalPrompts: rows.length,
-    message: `${rows.length}개 프롬프트가 저장되었습니다. 다음 단계: get_next_prompt 호출.`,
+    message: `${rows.length}개 프롬프트가 저장되었습니다. 다음 단계: processProject 호출 → 백엔드가 1장씩 순차 생성·저장. 이미지 생성에는 절대 직접 관여하지 마세요.`,
   };
 }
